@@ -21,6 +21,8 @@ A powerful, cross-platform video downloader application that allows you to downl
 
 ### Option 1: Download Pre-built Binary
 
+**[⬇️ Download Latest Release (v1.0.0)](https://github.com/aymandeepmind/video-downloader/releases/download/v1.0.0/ADM-Video-Downloader.zip)**
+
 1. Go to the [Releases](https://github.com/aymandeepmind/video-downloader/releases) page
 2. Download the latest version for your platform
 3. Extract the downloaded file
