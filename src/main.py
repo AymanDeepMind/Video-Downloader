@@ -8,7 +8,7 @@ import threading
 import queue
 import logging
 import traceback
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 from collections import defaultdict
 import re
 import time
