@@ -127,8 +127,6 @@ def paste_url():
     try:
         clipboard = root.clipboard_get()
         url_var.set(clipboard.strip())
-        url_entry.config(state="normal")
-        url_entry.config(state="readonly")
     except tk.TclError:
         status_label.config(text="Nothing to paste from clipboard")
     except Exception as e:
@@ -264,6 +262,9 @@ def fetch_formats_thread(url, type_choice):
         logger.error(f"Unexpected error in fetch_formats_thread: {str(e)}")
         logger.error(traceback.format_exc())
         q.put(("error", "Error processing URL"))
+    finally:
+        # Re-enable the fetch button after completion (success or error)
+        q.put(("enable_fetch", None))
 
 def toggle_title_edit():
     """Toggle video title entry between editable and locked states."""
@@ -558,6 +559,9 @@ def check_queue():
                 status_label.config(text=f"Error: {message[1]}")
                 fetch_button.config(state="normal")
                 
+            elif message[0] == "enable_fetch":
+                fetch_button.config(state="normal")
+                
             elif message[0] == "start_phase":
                 phase = message[1]
                 current_download_phase = phase
@@ -588,6 +592,7 @@ def check_queue():
                 status_label.config(text="Download successful!")
                 progress['value'] = 100
                 download_button.config(state="normal")
+                fetch_button.config(state="normal")  # Re-enable fetch button after download
                 
                 # Store the last downloaded file path
                 if filename and os.path.exists(filename):
@@ -598,7 +603,7 @@ def check_queue():
                 error_msg = message[1] if len(message) > 1 else "Unknown error"
                 status_label.config(text=f"Error: {error_msg}")
                 download_button.config(state="normal")
-                fetch_button.config(state="normal")
+                fetch_button.config(state="normal")  # Re-enable fetch button on error
                 
     except queue.Empty:
         pass
@@ -719,7 +724,7 @@ root.columnconfigure(1, weight=1)
 url_label = ttk.Label(root, text="Video URL:")
 url_label.grid(row=1, column=0, sticky="e", padx=5, pady=2)
 url_var = tk.StringVar()
-url_entry = ttk.Entry(root, textvariable=url_var, width=40)
+url_entry = ttk.Entry(root, textvariable=url_var, width=40, state="disabled")
 url_entry.grid(row=1, column=1, padx=5, pady=2)
 paste_button = ttk.Button(root, text="Paste", command=paste_url)
 paste_button.grid(row=1, column=2, padx=5, pady=2)
@@ -780,9 +785,6 @@ status_label.grid(row=12, column=0, columnspan=3, padx=5, pady=2)
 # Create a version label centered
 version_label = ttk.Label(root, text="github.com/aymandeepmind", font=("Segoe UI", 8))
 version_label.grid(row=13, column=0, columnspan=3, pady=2)
-
-# Set the URL entry to normal initially
-url_entry.config(state="normal")
 
 root.after(100, check_queue)
 root.protocol("WM_DELETE_WINDOW", on_closing)

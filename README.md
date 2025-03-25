@@ -19,7 +19,7 @@ A powerful, cross-platform video downloader application that allows you to downl
 
 ## Installation
 
-### Option 1: Download Pre-built Binary
+### Option 1: Download Binary (For common users)
 
 **[⬇️ Download Latest Release (v1.0.0)](https://github.com/aymandeepmind/video-downloader/releases/download/v1.0.0/ADM.Video.Downloader.7z)**
 
@@ -28,7 +28,7 @@ A powerful, cross-platform video downloader application that allows you to downl
 3. Extract the downloaded file
 4. Run the executable (`ADM Video Downloader.exe` on Windows)
 
-### Option 2: Run from Source
+### Option 2: Run from Source (Mainly for developers)
 
 1. Clone this repository:
    ```
@@ -70,7 +70,7 @@ To create a standalone executable:
 
 ```
 pip install pyinstaller
-pyinstaller --onefile --windowed --icon=icon.ico --add-data "ffmpeg;ffmpeg" --add-data "icon.ico;." src/main.py
+pyinstaller --onedir --windowed --icon=icon.ico --add-data "assets/ffmpeg;assets/ffmpeg" --add-data "icon.ico;." src/main.py
 ```
 
 ## License
