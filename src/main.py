@@ -30,19 +30,17 @@ def resource_path(relative_path):
 # Set up FFmpeg location for bundled version
 if getattr(sys, 'frozen', False):
     # Running as compiled exe
-    ffmpeg_path = resource_path('ffmpeg')
+    ffmpeg_path = resource_path('assets/ffmpeg/ffmpeg.exe')
 else:
     # Running in development environment
-    ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
+    ffmpeg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets', 'ffmpeg', 'ffmpeg.exe')
 
-# Add FFmpeg to environment path for this process only
-os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
+# Add FFmpeg directory to environment path for this process only
+ffmpeg_dir = os.path.dirname(ffmpeg_path)
+os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ["PATH"]
 
-# Set FFmpeg executable path based on OS
-if os.name == 'nt':  # Windows
-    ffmpeg_executable = os.path.join(ffmpeg_path, "ffmpeg.exe")
-else:  # Unix systems
-    ffmpeg_executable = os.path.join(ffmpeg_path, "ffmpeg")
+# Set FFmpeg executable path
+ffmpeg_executable = ffmpeg_path
 
 # Set up logging
 logging.basicConfig(
@@ -51,6 +49,11 @@ logging.basicConfig(
     filename=os.path.join(os.path.expanduser("~"), '.yt_downloader.log')
 )
 logger = logging.getLogger('yt_downloader')
+
+# Add debug logging for FFmpeg path
+logger.info(f"FFmpeg path: {ffmpeg_executable}")
+if not os.path.exists(ffmpeg_executable):
+    logger.error(f"FFmpeg not found at: {ffmpeg_executable}")
 
 # Queue for thread communication
 q = queue.Queue()
