@@ -674,7 +674,12 @@ root.resizable(False, False)
 # Set application icon for both taskbar and window title
 try:
     # Determine icon path based on whether we're running in frozen mode
-    icon_path = resource_path('icon.ico') if getattr(sys, 'frozen', False) else 'icon.ico'
+    if getattr(sys, 'frozen', False):
+        # Running as compiled exe
+        icon_path = resource_path('assets/icon.ico')
+    else:
+        # Running in development environment
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets', 'icon.ico')
     
     # Set window icon
     root.iconbitmap(icon_path)
@@ -686,6 +691,7 @@ try:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
 except Exception as e:
     logger.error(f"Failed to set application icon: {str(e)}")
+    logger.error(f"Icon path attempted: {icon_path}")
 
 # Set the title bar color to match the theme (Windows only)
 if os.name == 'nt':
