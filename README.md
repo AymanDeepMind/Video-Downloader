@@ -1,6 +1,6 @@
 # ADM Video Downloader
 
-A powerful, cross-platform video downloader application that allows you to download videos and audio from various online platforms with customizable quality options.
+A powerful Windows video downloader application that allows you to download videos and audio from various online platforms with customizable quality options.
 
 ![ADM Video Downloader Screenshot](screenshots/app_screenshot.png)
 
@@ -15,18 +15,20 @@ A powerful, cross-platform video downloader application that allows you to downl
 - **User-Friendly Interface**: Clean, themed UI with progress tracking
 - **Persistent Settings**: Remembers your download folder location
 - **Built-in FFmpeg**: Bundled with FFmpeg for media conversion
-- **Cross-Platform**: Works on Windows, macOS, and Linux
+
+## System Requirements
+
+- Windows 7, 8, 8.1, 10, or 11
+- No installation required (portable application)
 
 ## Installation
 
 ### Option 1: Download Binary (For common users)
 
-**[⬇️ Download Latest Release (v1.0.0)](https://github.com/aymandeepmind/video-downloader/releases/download/v1.0.0/master.zip)**
-
 1. Go to the [Releases](https://github.com/aymandeepmind/video-downloader/releases) page
-2. Download the latest version for your platform
+2. Download the latest version
 3. Extract the downloaded file
-4. Run the executable (`ADM Video Downloader.exe` on Windows)
+4. Run `ADM Video Downloader.exe`
 
 ### Option 2: Run from Source (Mainly for developers)
 
@@ -58,7 +60,7 @@ A powerful, cross-platform video downloader application that allows you to downl
 
 ## Dependencies
 
-- Python 3.6+
+- Python 3.6+ (for development)
 - yt-dlp
 - tkinter
 - ttkthemes
