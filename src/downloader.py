@@ -3,8 +3,11 @@ import os
 import time
 import threading
 import logging
+import random
+import tempfile
 from collections import defaultdict
 from utils import format_size, format_time, ffmpeg_executable, sanitize_filename, logger
+from config import load_fragments_config, save_fragments_config
 
 class Downloader:
     def __init__(self, queue):
@@ -15,6 +18,15 @@ class Downloader:
         self.progress_state = [0, None]  # [current phase index, current filename]
         self.download_sequence = []
         self.active_threads = []
+        self.calibration_lock = threading.Lock()
+        self.is_calibrating = False
+        
+        # Load saved optimal fragments from config, or use default if not found
+        saved_fragments = load_fragments_config()
+        self.optimal_fragments = saved_fragments if saved_fragments is not None else 3
+        logger.info(f"Loaded optimal fragments setting: {self.optimal_fragments}")
+        
+        self.temp_files = []  # Track temporary files for cleanup
 
     def fetch_formats(self, url, type_choice):
         """Initiate fetching of video formats."""
@@ -105,6 +117,10 @@ class Downloader:
             
     def start_download(self, url, type_choice, format_str, folder, user_title):
         """Start the download with selected options."""
+        # Check if calibration is running
+        if self.is_calibrating:
+            return False, "Please wait for calibration to complete"
+            
         # Create and start the thread
         if format_str not in self.format_map:
             return False, "Invalid format selected"
@@ -127,6 +143,7 @@ class Downloader:
                 'socket_timeout': 30,
                 'retries': 5,
                 'ffmpeg_location': ffmpeg_executable,
+                'concurrent_fragment_downloads': self.optimal_fragments,
             }
         elif type_choice == '2':
             self.download_sequence = ["video"]
@@ -138,6 +155,7 @@ class Downloader:
                 'socket_timeout': 30,
                 'retries': 5,
                 'ffmpeg_location': ffmpeg_executable,
+                'concurrent_fragment_downloads': self.optimal_fragments,
             }
         elif type_choice == '3':
             self.download_sequence = ["audio"]
@@ -150,6 +168,7 @@ class Downloader:
                 'socket_timeout': 30,
                 'retries': 5,
                 'ffmpeg_location': ffmpeg_executable,
+                'concurrent_fragment_downloads': self.optimal_fragments,
             }
             
         base_filename = sanitize_filename(f"{user_title} - {format_part}")
@@ -293,4 +312,165 @@ class Downloader:
                 self.queue.put(("start_phase", "merging"))
                 
         except Exception as e:
-            logger.error(f"Error in progress_hook: {str(e)}") 
+            logger.error(f"Error in progress_hook: {str(e)}")
+            
+    def start_calibration(self):
+        """Start the Internet speed calibration process."""
+        if self.is_calibrating:
+            return False, "Calibration already in progress"
+            
+        self.queue.put(("calibrate_start", None))
+        
+        # Create and start the calibration thread
+        calibrate_thread = threading.Thread(target=self._calibration_thread, daemon=True)
+        calibrate_thread.do_run = True  # Flag for cancellation
+        self.active_threads.append(calibrate_thread)
+        calibrate_thread.start()
+        
+        return True, None
+        
+    def _calibration_thread(self):
+        """Perform internet speed calibration in a separate thread."""
+        # Store the current value in case calibration fails
+        previous_fragments = self.optimal_fragments
+        
+        try:
+            with self.calibration_lock:
+                self.is_calibrating = True
+                
+                # We'll use a set of sample videos to test download speed
+                # These are very short videos that are commonly used for testing
+                test_videos = [
+                    'https://www.youtube.com/watch?v=jNQXAC9IVRw',  # First YouTube video
+                    'https://www.youtube.com/watch?v=2lAe1cqCOXo',  # Short YouTube video
+                    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',  # Another common test video
+                ]
+                
+                # Use only one random video for speed test
+                test_video = random.choice(test_videos)
+                
+                # Create temp directory for calibration downloads
+                temp_dir = tempfile.mkdtemp(prefix="yt_calibration_")
+                self.temp_files.append(temp_dir)  # Track for cleanup
+                
+                # Test with different concurrent fragment counts
+                fragments_to_test = [1, 3, 5, 8, 10]
+                speeds = {}
+                
+                # First get video info
+                info_opts = {
+                    'quiet': True,
+                    'format': 'best[height<=480]',  # Use a small format for testing
+                    'socket_timeout': 15,
+                    'retries': 2,
+                    'skip_download': True,
+                }
+                
+                with yt_dlp.YoutubeDL(info_opts) as ydl:
+                    self.queue.put(("calibration_progress", 5, "Preparing calibration..."))
+                    info = ydl.extract_info(test_video, download=False)
+                    
+                if not info:
+                    self.queue.put(("calibration_error", "Could not retrieve test video information"))
+                    self.optimal_fragments = previous_fragments  # Restore previous value
+                    return
+                
+                # Perform tests with different fragment counts
+                total_tests = len(fragments_to_test)
+                for i, fragments in enumerate(fragments_to_test):
+                    # Update progress based on which test we're running
+                    progress_percent = 5 + (i / total_tests) * 90  # 5-95% progress
+                    self.queue.put(("calibration_progress", progress_percent, 
+                                   f"Calibrating internet... ({fragments} fragments)"))
+                    
+                    # Configure download options
+                    test_opts = {
+                        'quiet': True,
+                        'format': 'best[height<=480]',  # Use a small format for testing
+                        'progress_hooks': [self._calibration_hook],
+                        'socket_timeout': 15,
+                        'retries': 2,
+                        'max_downloads': 1,
+                        'concurrent_fragment_downloads': fragments,
+                        'outtmpl': os.path.join(temp_dir, f'test_{fragments}_%(id)s.%(ext)s'),
+                    }
+                    
+                    self.test_speed = 0
+                    start_time = time.time()
+                    
+                    # Download first 10 seconds only
+                    try:
+                        with yt_dlp.YoutubeDL(test_opts) as ydl:
+                            ydl.download([f"{test_video}"])
+                    except Exception as e:
+                        logger.error(f"Error during calibration with {fragments} fragments: {str(e)}")
+                        # Continue with other tests
+                        
+                    # Record the maximum speed achieved
+                    speeds[fragments] = self.test_speed
+                
+                # Determine optimal fragment count based on speed tests
+                if speeds:
+                    # Choose the fragment count that gave the highest speed
+                    optimal_fragments = max(speeds.items(), key=lambda x: x[1])[0]
+                    self.optimal_fragments = optimal_fragments
+                    
+                    # Save the optimal fragments to config file
+                    save_fragments_config(optimal_fragments)
+                    
+                    # Log the results
+                    logger.info(f"Calibration results: {speeds}")
+                    logger.info(f"Optimal fragments: {optimal_fragments} (saved to config)")
+                    
+                    self.queue.put(("calibration_progress", 100, f"Calibration complete!"))
+                    self.queue.put(("calibration_result", optimal_fragments, max(speeds.values())))
+                else:
+                    # If all tests failed, use the previous value or default
+                    self.optimal_fragments = previous_fragments
+                    self.queue.put(("calibration_error", "Calibration failed, using previous settings"))
+                
+                # Clean up temp directory
+                try:
+                    import shutil
+                    shutil.rmtree(temp_dir)
+                    self.temp_files.remove(temp_dir)
+                except Exception as e:
+                    logger.error(f"Error cleaning up temp directory: {str(e)}")
+                
+        except Exception as e:
+            logger.error(f"Error during calibration: {str(e)}")
+            self.queue.put(("calibration_error", f"Calibration failed: {str(e)}"))
+            # Restore previous value if calibration fails
+            self.optimal_fragments = previous_fragments
+        finally:
+            self.is_calibrating = False
+            self.queue.put(("calibrate_end", None))
+            
+    def _calibration_hook(self, d):
+        """Hook to capture speed during calibration."""
+        if d['status'] == 'downloading':
+            speed = d.get('speed', 0)
+            if speed:
+                # Convert to MB/s and update max speed
+                speed_mbps = speed / 1048576
+                self.test_speed = max(self.test_speed, speed_mbps)
+                
+    def cleanup(self):
+        """Clean up temporary files and resources."""
+        try:
+            # Clean up any temp files
+            for temp_path in self.temp_files:
+                if os.path.exists(temp_path):
+                    if os.path.isdir(temp_path):
+                        import shutil
+                        try:
+                            shutil.rmtree(temp_path)
+                        except Exception as e:
+                            logger.error(f"Error removing temp directory {temp_path}: {str(e)}")
+                    else:
+                        try:
+                            os.remove(temp_path)
+                        except Exception as e:
+                            logger.error(f"Error removing temp file {temp_path}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error during cleanup: {str(e)}") 

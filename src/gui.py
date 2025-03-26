@@ -30,7 +30,7 @@ class VideoDownloaderApp:
         
     def setup_ui(self):
         """Set up the user interface."""
-        self.root.title("ADM Video Downloader")
+        self.root.title("ADM Video Downloader v.1.1.0")
         self.root.minsize(500, 370)
         self.root.resizable(False, False)
         
@@ -137,9 +137,18 @@ class VideoDownloaderApp:
         radio3 = ttk.Radiobutton(self.root, text="Audio Only (MP3)", variable=self.type_var, value="3")
         radio3.grid(row=6, column=1, sticky="w", padx=5, pady=2)
 
-        # Fetch Formats Button
-        self.fetch_button = ttk.Button(self.root, text="Fetch Formats", command=self.fetch_formats)
-        self.fetch_button.grid(row=7, column=1, padx=5, pady=2)
+        # Create a frame for the buttons in row 7
+        button_frame = ttk.Frame(self.root)
+        button_frame.grid(row=7, column=1, padx=5, pady=2, sticky="ew")
+        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(1, weight=1)
+
+        # Add Calibrate and Fetch Formats buttons to the frame
+        self.calibrate_button = ttk.Button(button_frame, text="Calibrate", command=self.start_calibration)
+        self.calibrate_button.grid(row=0, column=0, padx=(0, 5), sticky="e")
+
+        self.fetch_button = ttk.Button(button_frame, text="Fetch Formats", command=self.fetch_formats)
+        self.fetch_button.grid(row=0, column=1, padx=(5, 0), sticky="w")
 
         # Format Selection
         format_label = ttk.Label(self.root, text="Select Format:")
@@ -156,13 +165,13 @@ class VideoDownloaderApp:
         browse_button.grid(row=9, column=2, padx=5, pady=2)
 
         # Create a frame to center the buttons
-        button_frame = ttk.Frame(self.root)
-        button_frame.grid(row=10, column=0, columnspan=3, pady=10)
+        action_button_frame = ttk.Frame(self.root)
+        action_button_frame.grid(row=10, column=0, columnspan=3, pady=10)
 
         # Download and Open Folder Buttons
-        open_folder_button = ttk.Button(button_frame, text="Open Folder", command=self.open_download_folder)
+        open_folder_button = ttk.Button(action_button_frame, text="Open Folder", command=self.open_download_folder)
         open_folder_button.pack(side=tk.LEFT, padx=10)
-        self.download_button = ttk.Button(button_frame, text="Download", command=self.start_download, state="disabled")
+        self.download_button = ttk.Button(action_button_frame, text="Download", command=self.start_download, state="disabled")
         self.download_button.pack(side=tk.LEFT, padx=10)
 
         # Progress Bar and Status
@@ -172,8 +181,12 @@ class VideoDownloaderApp:
         self.status_label.grid(row=12, column=0, columnspan=3, padx=5, pady=2)
 
         # Create a version label centered
-        version_label = ttk.Label(self.root, text="github.com/aymandeepmind", font=("Segoe UI", 8))
-        version_label.grid(row=13, column=0, columnspan=3, pady=2)
+        version_label = ttk.Label(
+            self.root, 
+            text="                 Calibrate regularly to enhance download speeds. github.com/aymandeepmind", 
+            font=("Segoe UI", 8)
+        )
+        version_label.grid(row=13, column=0, columnspan=3, pady=2, sticky="ew")
         
     def load_saved_config(self):
         """Load the saved configuration."""
@@ -210,6 +223,7 @@ class VideoDownloaderApp:
                 elif message[0] == "error":
                     self.status_label.config(text=f"Error: {message[1]}")
                     self.fetch_button.config(state="normal")
+                    self.calibrate_button.config(state="normal")
                     
                 elif message[0] == "enable_fetch":
                     self.fetch_button.config(state="normal")
@@ -245,7 +259,8 @@ class VideoDownloaderApp:
                     self.status_label.config(text="Download successful!")
                     self.progress['value'] = 100
                     self.download_button.config(state="normal")
-                    self.fetch_button.config(state="normal")  # Re-enable fetch button after download
+                    self.fetch_button.config(state="normal")
+                    self.calibrate_button.config(state="normal")
                     
                     # Store the last downloaded file path
                     if filename and os.path.exists(filename):
@@ -255,7 +270,39 @@ class VideoDownloaderApp:
                     error_msg = message[1] if len(message) > 1 else "Unknown error"
                     self.status_label.config(text=f"Error: {error_msg}")
                     self.download_button.config(state="normal")
-                    self.fetch_button.config(state="normal")  # Re-enable fetch button on error
+                    self.fetch_button.config(state="normal")
+                    self.calibrate_button.config(state="normal")
+                    
+                # Handle calibration messages
+                elif message[0] == "calibrate_start":
+                    self.calibrate_button.config(state="disabled")
+                    self.fetch_button.config(state="disabled")
+                    self.download_button.config(state="disabled")
+                    self.progress['value'] = 0
+                    self.status_label.config(text="Starting calibration...")
+                    
+                elif message[0] == "calibrate_end":
+                    self.calibrate_button.config(state="normal")
+                    self.fetch_button.config(state="normal")
+                    
+                elif message[0] == "calibration_progress":
+                    percent = message[1]
+                    status_text = message[2] if len(message) > 2 else f"Calibrating internet... ({percent:.2f}%)"
+                    self.progress['value'] = percent
+                    self.status_label.config(text=status_text)
+                    
+                elif message[0] == "calibration_result":
+                    fragments = message[1]
+                    speed = message[2] if len(message) > 2 else 0
+                    self.progress['value'] = 100
+                    self.status_label.config(text=f"Calibration complete! Optimal setting: {fragments} fragments ({speed:.1f} MB/s)")
+                    
+                elif message[0] == "calibration_error":
+                    error_msg = message[1]
+                    self.status_label.config(text=f"Calibration error: {error_msg}")
+                    self.calibrate_button.config(state="normal")
+                    self.fetch_button.config(state="normal")
+                    self.progress['value'] = 0
                     
         except queue.Empty:
             pass
@@ -334,12 +381,24 @@ class VideoDownloaderApp:
             
         self.status_label.config(text="Fetching formats...")
         self.fetch_button.config(state="disabled")
+        self.calibrate_button.config(state="disabled")
         self.download_button.config(state="disabled")
         self.format_combo.set('')
         self.format_combo['values'] = []
         
         # Start fetching formats
         self.downloader.fetch_formats(url, type_choice)
+        
+    def start_calibration(self):
+        """Start the internet speed calibration process."""
+        if not check_network():
+            self.status_label.config(text="Network error - check your connection")
+            return
+            
+        success, error_msg = self.downloader.start_calibration()
+        
+        if not success:
+            self.status_label.config(text=error_msg)
         
     def start_download(self):
         """Start the download with selected options."""
@@ -382,6 +441,7 @@ class VideoDownloaderApp:
                 
             self.status_label.config(text="Starting download...")
             self.download_button.config(state="disabled")
+            self.calibrate_button.config(state="disabled")
             self.progress['value'] = 0
             
         except Exception as e:
@@ -389,6 +449,7 @@ class VideoDownloaderApp:
             logger.error(traceback.format_exc())
             self.status_label.config(text="Error starting download")
             self.download_button.config(state="normal")
+            self.calibrate_button.config(state="normal")
             
     def open_download_folder(self):
         """Open the folder specified in the download folder entry."""
@@ -421,6 +482,9 @@ class VideoDownloaderApp:
             current_folder = self.folder_entry.get().strip()
             if current_folder:
                 save_config(current_folder)
+            
+            # Clean up any temporary files
+            self.downloader.cleanup()
                 
             # Clean up log handlers
             for handler in logger.handlers[:]:
