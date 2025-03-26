@@ -1,7 +1,15 @@
 import os
 import configparser
 import logging
-from utils import logger
+import sys
+
+# Adjust import paths dynamically
+if getattr(sys, 'frozen', False):
+    # Running as compiled .exe
+    from src.utils import logger
+else:
+    # Running directly as .py
+    from utils import logger
 
 # Config file path
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), ".yt_downloader_config.ini")

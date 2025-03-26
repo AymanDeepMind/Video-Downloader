@@ -10,9 +10,17 @@ import traceback
 import subprocess
 from tkinter import filedialog
 
-from utils import resource_path, logger, check_network
-from config import load_config, save_config
-from downloader import Downloader
+# Adjust import paths dynamically
+if getattr(sys, 'frozen', False):
+    # Running as compiled .exe
+    from src.utils import resource_path, logger, check_network
+    from src.config import load_config, save_config
+    from src.downloader import Downloader
+else:
+    # Running directly as .py
+    from utils import resource_path, logger, check_network
+    from config import load_config, save_config
+    from downloader import Downloader
 
 class VideoDownloaderApp:
     def __init__(self, root):

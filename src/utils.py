@@ -18,7 +18,8 @@ def resource_path(relative_path):
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
-        base_path = os.path.abspath(".")
+        # If not running as exe, use the src directory's parent
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
 
 def format_size(size):
@@ -60,19 +61,43 @@ def sanitize_filename(name):
 # Set up FFmpeg location for bundled version
 if getattr(sys, 'frozen', False):
     # Running as compiled exe
-    ffmpeg_path = resource_path('assets/ffmpeg/ffmpeg.exe')
+    try:
+        # First try _MEIPASS path (PyInstaller temp directory)
+        ffmpeg_path = os.path.join(sys._MEIPASS, 'assets', 'ffmpeg', 'ffmpeg.exe')
+        if not os.path.exists(ffmpeg_path):
+            # If not found, try relative to executable
+            ffmpeg_path = os.path.join(os.path.dirname(sys.executable), 'assets', 'ffmpeg', 'ffmpeg.exe')
+    except Exception as e:
+        logger.error(f"Error setting ffmpeg path in frozen state: {str(e)}")
+        ffmpeg_path = None
 else:
     # Running in development environment
-    ffmpeg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets', 'ffmpeg', 'ffmpeg.exe')
+    try:
+        # When running directly, ffmpeg should be in src/assets/ffmpeg
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        ffmpeg_path = os.path.join(current_dir, 'assets', 'ffmpeg', 'ffmpeg.exe')
+    except Exception as e:
+        logger.error(f"Error setting ffmpeg path in development: {str(e)}")
+        ffmpeg_path = None
 
 # Add FFmpeg directory to environment path for this process only
-ffmpeg_dir = os.path.dirname(ffmpeg_path)
-os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ["PATH"]
-
-# Set FFmpeg executable path
-ffmpeg_executable = ffmpeg_path
-
-# Add debug logging for FFmpeg path
-logger.info(f"FFmpeg path: {ffmpeg_executable}")
-if not os.path.exists(ffmpeg_executable):
-    logger.error(f"FFmpeg not found at: {ffmpeg_executable}") 
+if ffmpeg_path and os.path.exists(ffmpeg_path):
+    ffmpeg_dir = os.path.dirname(ffmpeg_path)
+    os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ["PATH"]
+    ffmpeg_executable = ffmpeg_path
+    logger.info(f"FFmpeg found at: {ffmpeg_executable}")
+else:
+    logger.error("FFmpeg not found in expected locations")
+    # Try to find ffmpeg in the current directory structure
+    ffmpeg_executable = None
+    search_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+    for root, dirs, files in os.walk(search_dir):
+        if 'ffmpeg.exe' in files:
+            ffmpeg_executable = os.path.join(root, 'ffmpeg.exe')
+            logger.info(f"Found FFmpeg at alternate location: {ffmpeg_executable}")
+            # Update PATH with the found location
+            os.environ["PATH"] = os.path.dirname(ffmpeg_executable) + os.pathsep + os.environ["PATH"]
+            break
+    
+    if not ffmpeg_executable:
+        logger.error("FFmpeg not found anywhere in the application directory") 

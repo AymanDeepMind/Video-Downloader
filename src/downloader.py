@@ -5,9 +5,18 @@ import threading
 import logging
 import random
 import tempfile
+import sys
 from collections import defaultdict
-from utils import format_size, format_time, ffmpeg_executable, sanitize_filename, logger
-from config import load_fragments_config, save_fragments_config
+
+# Adjust import paths dynamically
+if getattr(sys, 'frozen', False):
+    # Running as compiled .exe
+    from src.utils import format_size, format_time, ffmpeg_executable, sanitize_filename, logger
+    from src.config import load_fragments_config, save_fragments_config
+else:
+    # Running directly as .py
+    from utils import format_size, format_time, ffmpeg_executable, sanitize_filename, logger
+    from config import load_fragments_config, save_fragments_config
 
 class Downloader:
     def __init__(self, queue):

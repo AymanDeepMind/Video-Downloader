@@ -89,7 +89,10 @@ To create a standalone executable:
 
 ```
 pip install pyinstaller
-pyinstaller --onedir --windowed --icon=assets/icon.ico --add-data "assets/ffmpeg;assets/ffmpeg" --add-data "assets/icon.ico;assets" src/main.py
+```
+In the src directory, run this in the terminal:
+```
+pyinstaller main.spec
 ```
 
 ## License
