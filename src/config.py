@@ -6,7 +6,7 @@ import sys
 # Adjust import paths dynamically
 if getattr(sys, 'frozen', False):
     # Running as compiled .exe
-    from src.utils import logger
+    from utils import logger
 else:
     # Running directly as .py
     from utils import logger
