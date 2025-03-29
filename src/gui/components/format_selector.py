@@ -130,6 +130,11 @@ class FormatSelectorComponent(QWidget):
     def enable_fetch(self, enabled=True):
         """Enable or disable the fetch button."""
         self.fetch_button.setEnabled(enabled)
+        # Update button text based on state
+        if enabled:
+            self.fetch_button.setText("Fetch Formats")
+        else:
+            self.fetch_button.setText("Fetching...")
         
     def enable_format_selection(self, enabled=True):
         """Enable or disable the format dropdown."""

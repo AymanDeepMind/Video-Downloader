@@ -75,14 +75,29 @@ class ProgressSectionComponent(QWidget):
             return
         else:
             phase_text = "Downloading"
+        
+        # Format speed display    
+        if isinstance(speed_mbps, (int, float)):
+            speed_display = f"{speed_mbps:.1f} MB/s"
+        else:
+            # Handle case where speed could be a string (e.g., "Unknown" or already formatted)
+            if speed_mbps and speed_mbps.replace('.', '', 1).isdigit():
+                # It's a numeric string, add MB/s
+                speed_display = f"{speed_mbps} MB/s"
+            else:
+                # It's not numeric or empty
+                speed_display = f"{speed_mbps}"
             
-        status_text = f"{phase_text}... {percent:.1f}% ({speed_mbps} MB/s)"
-        if eta_str:
-            status_text += f" - ETA: {eta_str}"
-            
+        # Show only percentage and speed (no ETA)
+        status_text = f"{phase_text}... {percent:.1f}% ({speed_display})"
+        
         self.status_label.setText(status_text)
         
     def show_calibration_progress(self, percent):
         """Show calibration progress."""
         self.progress_bar.setValue(int(percent))
-        self.status_label.setText(f"Calibrating... {percent:.1f}%") 
+        self.status_label.setText(f"Calibrating... {percent:.1f}%")
+        
+    def set_status_message(self, message):
+        """Set a status message (used for PhantomJS and other status updates)."""
+        self.status_label.setText(message) 

@@ -13,10 +13,12 @@ if getattr(sys, 'frozen', False):
     # Running as compiled .exe
     from utils import format_size, format_time, ffmpeg_executable, sanitize_filename, logger
     from config import load_fragments_config, save_fragments_config
+    from phantom import PhantomJSHandler
 else:
     # Running directly as .py
     from utils import format_size, format_time, ffmpeg_executable, sanitize_filename, logger
     from config import load_fragments_config, save_fragments_config
+    from phantom import PhantomJSHandler
 
 class Downloader:
     def __init__(self, queue):
@@ -36,6 +38,9 @@ class Downloader:
         logger.info(f"Loaded optimal fragments setting: {self.optimal_fragments}")
         
         self.temp_files = []  # Track temporary files for cleanup
+        
+        # Initialize PhantomJS handler
+        self.phantom_handler = PhantomJSHandler()
 
     def fetch_formats(self, url, type_choice):
         """Initiate fetching of video formats."""
@@ -48,6 +53,36 @@ class Downloader:
     def _fetch_formats_thread(self, url, type_choice):
         """Fetch video formats in a separate thread."""
         try:
+            # Check if PhantomJS is required for this URL
+            use_phantom = self.phantom_handler.is_phantom_required(url)
+            
+            if use_phantom:
+                logger.info(f"Using PhantomJS for URL: {url}")
+                self.queue.put(("status", "Using PhantomJS to process this URL..."))
+                
+                # Extract media URLs using PhantomJS
+                phantom_result = self.phantom_handler.extract_media_urls(url)
+                
+                if "error" in phantom_result:
+                    self.queue.put(("error", f"PhantomJS error: {phantom_result['error']}"))
+                    return
+                    
+                # Get compatible URLs for yt-dlp
+                phantom_urls = self.phantom_handler.get_ytdlp_compatible_urls(phantom_result)
+                
+                if not phantom_urls:
+                    logger.warning("PhantomJS couldn't find any media URLs, falling back to yt-dlp")
+                    self.queue.put(("status", "PhantomJS couldn't find content, trying standard method..."))
+                else:
+                    # Use the title from PhantomJS if available
+                    if "title" in phantom_result and phantom_result["title"]:
+                        self.queue.put(("video_title", phantom_result["title"]))
+                    
+                    # Process each URL found by PhantomJS
+                    self._process_phantom_results(phantom_urls, type_choice)
+                    return
+            
+            # Standard yt-dlp extraction (fallback or default)
             opts = {
                 'quiet': True,
                 'socket_timeout': 30,
@@ -123,7 +158,83 @@ class Downloader:
         finally:
             # Re-enable the fetch button after completion (success or error)
             self.queue.put(("enable_fetch", None))
+    
+    def _process_phantom_results(self, phantom_urls, type_choice):
+        """Process the URLs extracted by PhantomJS."""
+        try:
+            formats = []
+            self.format_map = {}
             
+            # For each URL, try to extract format information
+            for url in phantom_urls:
+                try:
+                    opts = {
+                        'quiet': True,
+                        'socket_timeout': 10,
+                        'retries': 1
+                    }
+                    
+                    with yt_dlp.YoutubeDL(opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                        
+                    if info and 'formats' in info:
+                        formats.extend(info['formats'])
+                    elif info:
+                        # Single format
+                        format_id = f"phantom:{url}"
+                        ext = url.split('.')[-1].lower()
+                        if ext in ['mp4', 'webm', 'm3u8', 'mpd']:
+                            if type_choice in ("1", "2"):  # Video formats
+                                height = info.get('height', '?')
+                                fps = info.get('fps', '')
+                                fps_str = f" ({fps}fps)" if fps else ""
+                                size = info.get('filesize') or info.get('filesize_approx') or 0
+                                size_str = format_size(size) if size else "Unknown size"
+                                format_str = f"{height}p{fps_str} - {size_str}"
+                                self.format_map[format_str] = (format_id, ext)
+                                formats.append(format_str)
+                        elif ext in ['mp3', 'm4a']:
+                            if type_choice == "3":  # Audio formats
+                                abr = info.get('abr', 'Unknown')
+                                size = info.get('filesize') or info.get('filesize_approx') or 0
+                                size_str = format_size(size) if size else "Unknown size"
+                                format_str = f"{abr} kbps - {size_str}"
+                                self.format_map[format_str] = (format_id, ext)
+                                formats.append(format_str)
+                                
+                except Exception as e:
+                    logger.warning(f"Error processing PhantomJS URL {url}: {str(e)}")
+                    # Just continue with next URL on error
+            
+            # If we have direct URLs without format info, create generic entries
+            if not formats and phantom_urls:
+                # Create generic formats based on URL extensions
+                for i, url in enumerate(phantom_urls):
+                    ext = url.split('.')[-1].lower()
+                    format_id = f"phantom:{url}"
+                    
+                    if ext in ['mp4', 'webm', 'm3u8', 'mpd'] and type_choice in ("1", "2"):
+                        format_str = f"Video {i+1} - {ext.upper()}"
+                        self.format_map[format_str] = (format_id, ext)
+                        formats.append(format_str)
+                    elif ext in ['mp3', 'm4a'] and type_choice == "3":
+                        format_str = f"Audio {i+1} - {ext.upper()}"
+                        self.format_map[format_str] = (format_id, ext)
+                        formats.append(format_str)
+            
+            if formats:
+                # Make sure we always put a list in the queue
+                if isinstance(formats, str):
+                    formats = [formats]
+                self.queue.put(("formats", formats))
+            else:
+                # If no formats found with PhantomJS, inform the user
+                self.queue.put(("error", "No compatible formats found with PhantomJS"))
+                
+        except Exception as e:
+            logger.error(f"Error processing PhantomJS results: {str(e)}")
+            self.queue.put(("error", f"Error processing media from PhantomJS: {str(e)}"))
+
     def start_download(self, url, type_choice, format_str, folder, user_title):
         """Start the download with selected options."""
         # Check if calibration is running
@@ -141,46 +252,101 @@ class Downloader:
         user_title = sanitize_filename(user_title)
         format_part = format_str.split(" - ")[0]
         
-        if type_choice == '1':
-            self.download_sequence = ["video", "audio"]
-            expected_ext = 'mp4'
-            ydl_opts = {
-                'format': f"{format_id}+bestaudio",
-                'merge_output_format': 'mp4',
-                'progress_hooks': [self.progress_hook],
-                'no_mtime': True,
-                'socket_timeout': 30,
-                'retries': 5,
-                'ffmpeg_location': ffmpeg_executable,
-                'concurrent_fragment_downloads': self.optimal_fragments,
-            }
-        elif type_choice == '2':
-            self.download_sequence = ["video"]
+        # Check if this is a PhantomJS URL
+        is_phantom_url = format_id.startswith("phantom:")
+        
+        if is_phantom_url:
+            # Direct download using the PhantomJS extracted URL
+            if "Video" in format_str:
+                self.download_sequence = ["video"]
+                if type_choice == '2':  # If it's video only mode
+                    is_video_only = True
+                else:
+                    is_video_only = False
+            else:
+                self.download_sequence = ["audio"]
+                is_video_only = False
+                
+            direct_url = format_id.replace("phantom:", "")
             expected_ext = format_ext
-            ydl_opts = {
-                'format': format_id,
-                'progress_hooks': [self.progress_hook],
-                'no_mtime': True,
-                'socket_timeout': 30,
-                'retries': 5,
-                'ffmpeg_location': ffmpeg_executable,
-                'concurrent_fragment_downloads': self.optimal_fragments,
-            }
-        elif type_choice == '3':
-            self.download_sequence = ["audio"]
-            expected_ext = 'mp3'
-            ydl_opts = {
-                'format': format_id,
-                'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
-                'progress_hooks': [self.progress_hook],
-                'no_mtime': True,
-                'socket_timeout': 30,
-                'retries': 5,
-                'ffmpeg_location': ffmpeg_executable,
-                'concurrent_fragment_downloads': self.optimal_fragments,
-            }
             
-        base_filename = sanitize_filename(f"{user_title} - {format_part}")
+            if type_choice == '3' and "Audio" in format_str:
+                # Audio download
+                ydl_opts = {
+                    'format': 'best',
+                    'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
+                    'progress_hooks': [self.progress_hook],
+                    'no_mtime': True,
+                    'socket_timeout': 30,
+                    'retries': 5,
+                    'ffmpeg_location': ffmpeg_executable,
+                }
+                expected_ext = 'mp3'
+                is_video_only = False
+            else:
+                # Video download
+                ydl_opts = {
+                    'format': 'best',
+                    'progress_hooks': [self.progress_hook],
+                    'no_mtime': True,
+                    'socket_timeout': 30,
+                    'retries': 5,
+                    'ffmpeg_location': ffmpeg_executable,
+                }
+                
+            # Override the URL with the direct URL from PhantomJS
+            direct_download_url = direct_url
+        else:
+            # Standard yt-dlp download
+            direct_download_url = url
+            is_video_only = False
+            
+            if type_choice == '1':
+                self.download_sequence = ["video", "audio"]
+                expected_ext = 'mp4'
+                ydl_opts = {
+                    'format': f"{format_id}+bestaudio",
+                    'merge_output_format': 'mp4',
+                    'progress_hooks': [self.progress_hook],
+                    'no_mtime': True,
+                    'socket_timeout': 30,
+                    'retries': 5,
+                    'ffmpeg_location': ffmpeg_executable,
+                    'concurrent_fragment_downloads': self.optimal_fragments,
+                }
+            elif type_choice == '2':
+                self.download_sequence = ["video"]
+                expected_ext = format_ext
+                ydl_opts = {
+                    'format': format_id,
+                    'progress_hooks': [self.progress_hook],
+                    'no_mtime': True,
+                    'socket_timeout': 30,
+                    'retries': 5,
+                    'ffmpeg_location': ffmpeg_executable,
+                    'concurrent_fragment_downloads': self.optimal_fragments,
+                }
+                is_video_only = True
+            elif type_choice == '3':
+                self.download_sequence = ["audio"]
+                expected_ext = 'mp3'
+                ydl_opts = {
+                    'format': format_id,
+                    'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
+                    'progress_hooks': [self.progress_hook],
+                    'no_mtime': True,
+                    'socket_timeout': 30,
+                    'retries': 5,
+                    'ffmpeg_location': ffmpeg_executable,
+                    'concurrent_fragment_downloads': self.optimal_fragments,
+                }
+            
+        # Create base filename with appropriate suffix
+        if is_video_only:  # Video Only (either standard or PhantomJS)
+            base_filename = sanitize_filename(f"{user_title} - {format_part} [Video only]")
+        else:  # Audio only or Video+Audio
+            base_filename = sanitize_filename(f"{user_title} - {format_part}")
+            
         full_filename = os.path.join(folder, f"{base_filename}.{expected_ext}")
         
         # Validate the download path
@@ -190,17 +356,19 @@ class Downloader:
             
         ydl_opts['outtmpl'] = os.path.join(folder, f"{base_filename}.%(ext)s")
         
+        # Reset progress state
         self.progress_state = [0, None]
-        self.current_download_phase = None
+        self.current_download_phase = None  # Reset phase
         
         # Set the initial phase immediately
         self.current_download_phase = self.download_sequence[0]
         self.queue.put(("start_phase", self.current_download_phase))
+        self.queue.put(("set_phase", self.current_download_phase))  # Add set_phase for queue handler
         
         # Create and start the thread
         download_thread_obj = threading.Thread(
             target=self._download_thread, 
-            args=(url, ydl_opts, type_choice, folder, base_filename, expected_ext), 
+            args=(direct_download_url, ydl_opts, type_choice, folder, base_filename, expected_ext, is_phantom_url), 
             daemon=True
         )
         download_thread_obj.do_run = True  # Flag for cancellation
@@ -240,9 +408,13 @@ class Downloader:
             logger.error(f"Error validating download path: {str(e)}")
             return False, "Error validating download path"
             
-    def _download_thread(self, url, ydl_opts, type_choice, folder, base_filename, expected_ext):
+    def _download_thread(self, url, ydl_opts, type_choice, folder, base_filename, expected_ext, is_phantom_url=False):
         """Perform the download in a separate thread and set modification time after download."""
         try:
+            # Log whether we're using PhantomJS URL
+            if is_phantom_url:
+                logger.info(f"Downloading using PhantomJS extracted URL: {url}")
+            
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                     
@@ -292,6 +464,7 @@ class Downloader:
                 if self.current_download_phase is None and self.progress_state[0] < len(self.download_sequence):
                     self.current_download_phase = self.download_sequence[self.progress_state[0]]
                     self.queue.put(("start_phase", self.current_download_phase))
+                    self.queue.put(("set_phase", self.current_download_phase))  # Send set_phase message for queue handler
                     
                 downloaded = d.get('downloaded_bytes', 0)
                 total = d.get('total_bytes') or d.get('total_bytes_estimate')
@@ -314,11 +487,16 @@ class Downloader:
                     self.progress_state[0] += 1
                     self.current_download_phase = self.download_sequence[self.progress_state[0]]
                     self.queue.put(("start_phase", self.current_download_phase))
+                    self.queue.put(("set_phase", self.current_download_phase))  # Send set_phase message for queue handler
                 else:
+                    self.current_download_phase = "merging"
                     self.queue.put(("start_phase", "merging"))
+                    self.queue.put(("set_phase", "merging"))  # Send set_phase message for queue handler
                     
             elif d['status'] == 'processing':
+                self.current_download_phase = "merging"
                 self.queue.put(("start_phase", "merging"))
+                self.queue.put(("set_phase", "merging"))  # Send set_phase message for queue handler
                 
         except Exception as e:
             logger.error(f"Error in progress_hook: {str(e)}")
