@@ -1,0 +1,60 @@
+# Hover-Paste Feature Implementation Plan
+
+## Overview
+Implement a hover-paste feature that shows the clipboard URL in the URL entry field when hovering over the paste button, with fade effects.
+
+## Components Involved
+- URLInputComponent (src/gui/components/url_input.py)
+- Paste button
+- URL entry field
+- Clipboard handling
+
+## Implementation Steps
+
+1. Enhance URLInputComponent class:
+   - Add event handlers for mouse hover (enterEvent/leaveEvent or event filter)
+   - Add animation properties for fade effects
+   - Add methods to preview and clear clipboard content
+
+2. URL Validation:
+   - Reuse existing URL validation pattern in paste_url method
+   - Create a separate method to check if clipboard contains valid URL
+
+3. Mouse Hover Implementation:
+   - Add enterEvent method to detect when mouse enters paste button
+   - Add leaveEvent method to detect when mouse leaves paste button
+   - Use existing clipboard.paste() to get clipboard content
+
+4. Fade Animation Implementation:
+   - Use QPropertyAnimation for opacity effects
+   - Create fade-in animation (duration: 300ms)
+   - Create fade-out animation (duration: 300ms)
+   - Connect animation states to URL entry visibility
+
+5. Clipboard Preview Logic:
+   - On hover, check clipboard for valid URL
+   - If valid, show URL in entry field with fade-in effect
+   - Store original URL entry content to restore later
+   - Add visual indicator that content is a preview (e.g., different background color)
+
+6. Restore Original State:
+   - On mouse leave, restore original URL if paste button wasn't clicked
+   - Apply fade-out effect when restoring original state
+
+7. Preserve Functionality:
+   - Maintain original paste button click behavior
+   - Ensure URL validation still works properly
+   - Make sure signals are emitted appropriately
+
+## Technical Considerations
+- Use QGraphicsOpacityEffect for fade animations
+- Implement proper state management to track preview state
+- Ensure clipboard is only accessed when necessary (performance)
+- Handle edge cases (empty clipboard, invalid URLs, etc.)
+
+## Testing Plan
+1. Test hover behavior with valid URL in clipboard
+2. Test hover behavior with invalid content in clipboard
+3. Test clicking paste button during hover
+4. Test moving mouse away without clicking
+5. Test performance impact of continuous clipboard access 

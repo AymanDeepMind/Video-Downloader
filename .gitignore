@@ -17,6 +17,7 @@ pip-delete-this-directory.txt
 
 # Unit test / coverage reports
 plan.md
+plan.txt
 htmlcov/
 .coverage
 .coverage.*
