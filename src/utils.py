@@ -6,7 +6,7 @@ import logging
 
 # Set up logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     filename=os.path.join(os.path.expanduser("~"), '.yt_downloader.log')
 )
@@ -100,4 +100,45 @@ else:
             break
     
     if not ffmpeg_executable:
-        logger.error("FFmpeg not found anywhere in the application directory") 
+        logger.error("FFmpeg not found anywhere in the application directory")
+
+def get_ytdlp_executable():
+    """Get the path to the yt-dlp executable."""
+    # Set up yt-dlp binary location
+    if getattr(sys, 'frozen', False):
+        # Running as compiled exe
+        try:
+            # First try _MEIPASS path (PyInstaller temp directory)
+            ytdlp_path = os.path.join(sys._MEIPASS, 'assets', 'yt-dlp.exe')
+            if not os.path.exists(ytdlp_path):
+                # If not found, try relative to executable
+                ytdlp_path = os.path.join(os.path.dirname(sys.executable), 'assets', 'yt-dlp.exe')
+        except Exception as e:
+            logger.error(f"Error setting yt-dlp path in frozen state: {str(e)}")
+            ytdlp_path = None
+    else:
+        # Running in development environment
+        try:
+            # When running directly, yt-dlp should be in src/assets/
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            ytdlp_path = os.path.join(current_dir, 'assets', 'yt-dlp.exe')
+        except Exception as e:
+            logger.error(f"Error setting yt-dlp path in development: {str(e)}")
+            ytdlp_path = None
+
+    # Verify the binary exists
+    if ytdlp_path and os.path.exists(ytdlp_path):
+        logger.info(f"yt-dlp binary found at: {ytdlp_path}")
+        return ytdlp_path
+    else:
+        logger.error("yt-dlp binary not found in expected locations")
+        # Try to find yt-dlp in the current directory structure
+        search_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+        for root, dirs, files in os.walk(search_dir):
+            if 'yt-dlp.exe' in files:
+                ytdlp_path = os.path.join(root, 'yt-dlp.exe')
+                logger.info(f"Found yt-dlp at alternate location: {ytdlp_path}")
+                return ytdlp_path
+        
+        logger.error("yt-dlp binary not found anywhere in the application directory")
+        return None 

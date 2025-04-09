@@ -128,14 +128,19 @@ class FormatSelectorComponent(QWidget):
         self.format_combo.clear()
         
     def enable_fetch(self, enabled=True):
-        """Enable or disable the fetch button."""
+        """Enable or disable the fetch button WITHOUT changing text."""
         self.fetch_button.setEnabled(enabled)
-        # Update button text based on state
-        if enabled:
-            self.fetch_button.setText("Fetch Formats")
-        else:
-            self.fetch_button.setText("Fetching...")
-        
+        # Keep the button text consistent
+        self.fetch_button.setText("Fetch Formats")
+
+    def set_fetching_state(self, is_fetching):
+         """Set the button state specifically for fetching."""
+         self.fetch_button.setEnabled(not is_fetching)
+         if is_fetching:
+             self.fetch_button.setText("Fetching...")
+         else:
+             self.fetch_button.setText("Fetch Formats")
+
     def enable_format_selection(self, enabled=True):
         """Enable or disable the format dropdown."""
         self.format_combo.setEnabled(enabled) 

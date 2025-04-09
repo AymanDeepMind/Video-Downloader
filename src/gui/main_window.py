@@ -232,7 +232,8 @@ class VideoDownloaderApp(QMainWindow):
         
     def connect_menu_signals(self):
         """Connect signals from the menu bar."""
-        self.menu_bar.calibrate_triggered.connect(self.start_calibration)
+        # Remove calibration connection
+        # self.menu_bar.calibrate_triggered.connect(self.start_calibration)
         self.menu_bar.theme_toggle_triggered.connect(self.toggle_theme)
         self.menu_bar.default_format_triggered.connect(self.select_default_format)
         self.menu_bar.auto_fetch_toggled.connect(self.toggle_auto_fetch)
@@ -250,21 +251,15 @@ class VideoDownloaderApp(QMainWindow):
         self.format_selector.format_selected.connect(self.on_format_selected)
         
     def setup_queue_handlers(self):
-        """Set up the queue handlers to process events from downloader thread."""
-        # Connect signals from QueueHandler to appropriate slots
+        """Connect signals from the queue handler to UI slots."""
         self.queue_handler.formats_signal.connect(self.handle_formats)
         self.queue_handler.video_title_signal.connect(self.handle_video_title)
         self.queue_handler.error_signal.connect(self.handle_error)
         self.queue_handler.enable_fetch_signal.connect(self.handle_enable_fetch)
-        self.queue_handler.start_phase_signal.connect(self.handle_start_phase)
         self.queue_handler.progress_signal.connect(self.handle_progress)
-        self.queue_handler.phase_complete_signal.connect(self.handle_phase_complete)
         self.queue_handler.download_complete_signal.connect(self.handle_download_complete)
         self.queue_handler.merge_failed_signal.connect(self.handle_merge_failed)
         self.queue_handler.download_error_signal.connect(self.handle_download_error)
-        self.queue_handler.calibration_progress_signal.connect(self.handle_calibration_progress)
-        self.queue_handler.calibration_complete_signal.connect(self.handle_calibration_complete)
-        # Add status signal handler for PhantomJS messages
         self.queue_handler.status_signal.connect(self.handle_status)
         
     def register_theme_components(self):
@@ -324,60 +319,39 @@ class VideoDownloaderApp(QMainWindow):
         else:
             self.progress_section.set_status("No formats available.")
             
+        # Re-enable fetch button using correct state
+        self.format_selector.set_fetching_state(False)
+            
     def handle_video_title(self, data):
         """Handle video title message from queue."""
         # The data is already the title string, not a list
         if isinstance(data, str):
             self.video_title_entry.setText(data)
+            self.video_title_entry.setCursorPosition(0)  # Move cursor to the start
         else:
             # Fallback in case it's a list
             title = data[0] if isinstance(data, (list, tuple)) and data else ""
             self.video_title_entry.setText(title)
+            self.video_title_entry.setCursorPosition(0)  # Move cursor to the start
             
     def handle_error(self, data):
         """Handle error message from queue."""
         error_msg = data[0] if data else "Unknown error"
         self.progress_section.set_status(f"Error: {error_msg}")
-        self.format_selector.enable_fetch(True)
+        self.format_selector.set_fetching_state(False)
             
     def handle_enable_fetch(self, data):
         """Handle enable fetch message from queue."""
-        self.format_selector.enable_fetch(True)
+        self.format_selector.set_fetching_state(False) # Assuming enable_fetch means fetching is done
             
-    def handle_start_phase(self, data):
-        """Handle start phase message from queue."""
-        phase = data[0] if data else None
+    def handle_progress(self, data):
+        """Handle progress message from queue (without phase)."""
+        # Data structure is now a list: [percent, speed, eta]
+        percent = data[0] if len(data) >= 1 else 0
+        speed_mbps = data[1] if len(data) >= 2 else None # Can be float or string
+        eta_str = data[2] if len(data) > 2 else ""
         
-        if phase in ("video", "audio"):
-            self.progress_section.set_status(f"Downloading {phase}... 0.0%")
-            self.progress_section.set_progress(0)
-        elif phase == "merging":
-            self.progress_section.set_status("Merging formats...")
-            self.progress_section.set_progress(100)
-            
-    def handle_progress(self, data, phase):
-        """Handle progress message from queue."""
-        # Handle case where data is a float (percentage)
-        if isinstance(data, float):
-            percent = data
-            speed_mbps = "Unknown"
-            eta_str = ""
-        elif isinstance(data, (list, tuple)):
-            # Original logic for list/tuple data
-            percent = data[0] if len(data) >= 1 else 0
-            speed_mbps = data[1] if len(data) >= 2 else "Unknown"
-            eta_str = data[2] if len(data) > 2 else ""
-        else:
-            # Fallback for unexpected data types
-            percent = 0
-            speed_mbps = "Unknown"
-            eta_str = ""
-            
-        self.progress_section.update_download_progress(percent, speed_mbps, eta_str, phase)
-            
-    def handle_phase_complete(self, data):
-        """Handle phase complete message from queue."""
-        self.progress_section.set_progress(100)
+        self.progress_section.update_download_progress(percent, speed_mbps, eta_str)
             
     def handle_download_complete(self, data):
         """Handle download complete message from queue."""
@@ -403,20 +377,6 @@ class VideoDownloaderApp(QMainWindow):
         self.download_button.setEnabled(True)
         self.video_title_entry.setEnabled(True)
             
-    def handle_calibration_progress(self, data):
-        """Handle calibration progress message from queue."""
-        percent = data[0] if data else 0
-        self.progress_section.show_calibration_progress(percent)
-            
-    def handle_calibration_complete(self, data):
-        """Handle calibration complete message from queue."""
-        optimal_fragments = data[0] if data else "Unknown"
-        self.progress_section.set_progress(100)
-        self.progress_section.set_status(f"Calibration complete. Optimal fragments: {optimal_fragments}")
-        
-        # Re-enable buttons
-        self.format_selector.enable_fetch(True)
-            
     def handle_download_error(self, data):
         """Handle download error message from queue."""
         error_msg = data[0] if data else "Unknown error"
@@ -437,6 +397,8 @@ class VideoDownloaderApp(QMainWindow):
     @pyqtSlot(str)
     def on_url_changed(self, url):
         """Handle URL text changes."""
+        self.url_input.url_entry.setText(url)
+        self.url_input.url_entry.setCursorPosition(0)  # Move cursor to the start
         # Clear format selection when URL changes
         self.format_selector.clear_formats()
         self.download_button.setEnabled(False)
@@ -510,11 +472,9 @@ class VideoDownloaderApp(QMainWindow):
         self.format_selector.clear_formats()
         self.download_button.setEnabled(False)
         
-        # Set status
+        # Set status and disable fetch button (using fetching state)
         self.progress_section.set_status("Fetching available formats...")
-        
-        # Disable fetch button during operation
-        self.format_selector.enable_fetch(False)
+        self.format_selector.set_fetching_state(True)
         
         # Get selected type
         type_choice = str(self.download_options.get_selected_option())
@@ -562,7 +522,7 @@ class VideoDownloaderApp(QMainWindow):
         # Disable editing during download
         self.video_title_entry.setEnabled(False)
         
-        # Disable buttons during download
+        # Disable buttons during download (use enable_fetch for fetch button)
         self.download_button.setEnabled(False)
         self.format_selector.enable_fetch(False)
         
@@ -570,39 +530,15 @@ class VideoDownloaderApp(QMainWindow):
         success, error_msg = self.downloader.start_download(url, type_choice, format_str, folder, user_title)
         if not success:
             UIHelpers.show_warning(self, "Error", error_msg)
+            # Re-enable fetch button (not fetching state)
+            self.format_selector.enable_fetch(True)
             # Re-enable buttons and title editing
             self.download_button.setEnabled(True)
-            self.format_selector.enable_fetch(True)
+            self.format_selector.set_fetching_state(False)
             self.video_title_entry.setEnabled(True)
             # Reset progress
             self.progress_section.set_status(f"Error: {error_msg}")
             self.progress_section.set_progress(0)
-            
-    @pyqtSlot()
-    def start_calibration(self):
-        """Start the calibration process."""
-        # Check network
-        if not check_network():
-            UIHelpers.show_warning(self, "Error", "No internet connection. Please check your network settings.")
-            return
-            
-        # Confirm with user
-        if not UIHelpers.show_question(
-            self,
-            "Start Calibration",
-            "Calibration will test your connection to find optimal download settings. Continue?"
-        ):
-            return
-            
-        # Set status
-        self.progress_section.set_progress(0)
-        self.progress_section.set_status("Starting calibration...")
-        
-        # Disable buttons during calibration
-        self.format_selector.enable_fetch(False)
-        
-        # Start the calibration process
-        self.downloader.start_calibration()
             
     @pyqtSlot()
     def select_default_format(self):
@@ -680,4 +616,4 @@ class VideoDownloaderApp(QMainWindow):
         except Exception as e:
             print(f"Error during cleanup: {str(e)}")
             
-        event.accept() 
+        event.accept()

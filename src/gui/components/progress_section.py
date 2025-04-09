@@ -37,8 +37,8 @@ class ProgressSectionComponent(QWidget):
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setMinimumHeight(25)
         
-        # Version label
-        self.version_label = QLabel("TIP: Calibrate regularly to enhance download speeds. github.com/aymandeepmind")
+        # Version label (remove calibration tip)
+        self.version_label = QLabel("AUTHOR - github.com/aymandeepmind") # Or just version/link
         self.version_label.setAlignment(Qt.AlignCenter)
         
         # Add widgets to layout
@@ -61,43 +61,45 @@ class ProgressSectionComponent(QWidget):
         self.progress_bar.setValue(0)
         self.status_label.setText("")
         
-    def update_download_progress(self, percent, speed_mbps, eta_str="", phase=None):
-        """Update the progress display with download information."""
+    def update_download_progress(self, percent, speed_mbps, eta_str=""):
+        """Update the progress display with generic download information."""
         self.progress_bar.setValue(int(percent))
         
-        if phase == "video":
-            phase_text = "Downloading video"
-        elif phase == "audio":
-            phase_text = "Downloading audio"
-        elif phase == "merging":
-            phase_text = "Merging formats"
-            self.progress_bar.setValue(100)
-            return
-        else:
-            phase_text = "Downloading"
+        phase_text = "Downloading"
         
+        # Check if merging (based on percent, as merging happens after 100% download)
+        if percent >= 100:
+             # Check if the status message already indicates merging from the downloader
+            if "Merging" in self.status_label.text():
+                 phase_text = "Merging formats"
+            else: # If not explicitly merging, assume download finished
+                 phase_text = "Finishing"
+                 # Don't return yet, show 100% progress if needed
+
         # Format speed display    
         if isinstance(speed_mbps, (int, float)):
             speed_display = f"{speed_mbps:.1f} MB/s"
+        elif isinstance(speed_mbps, str) and speed_mbps.replace('.', '', 1).isdigit():
+            # It's a numeric string, add MB/s
+            speed_display = f"{speed_mbps} MB/s"
         else:
-            # Handle case where speed could be a string (e.g., "Unknown" or already formatted)
-            if speed_mbps and speed_mbps.replace('.', '', 1).isdigit():
-                # It's a numeric string, add MB/s
-                speed_display = f"{speed_mbps} MB/s"
-            else:
-                # It's not numeric or empty
-                speed_display = f"{speed_mbps}"
+            # It's not numeric or empty, might be ETA string or other status
+            speed_display = f"{speed_mbps if speed_mbps else ''}"
             
-        # Show only percentage and speed (no ETA)
-        status_text = f"{phase_text}... {percent:.1f}% ({speed_display})"
+        # Combine status text
+        if phase_text == "Merging formats" or phase_text == "Finishing":
+            status_text = f"{phase_text}..."
+        elif speed_display and eta_str:
+            status_text = f"{phase_text}... ({speed_display} - ETA: {eta_str})"
+        elif speed_display:
+            status_text = f"{phase_text}... ({speed_display})"
+        else:
+            status_text = f"{phase_text}... "
         
         self.status_label.setText(status_text)
         
-    def show_calibration_progress(self, percent):
-        """Show calibration progress."""
-        self.progress_bar.setValue(int(percent))
-        self.status_label.setText(f"Calibrating... {percent:.1f}%")
-        
     def set_status_message(self, message):
         """Set a status message (used for PhantomJS and other status updates)."""
-        self.status_label.setText(message) 
+        # Don't overwrite progress messages if download is active
+        if "Downloading" not in self.status_label.text() and "Merging" not in self.status_label.text():
+             self.status_label.setText(message) 

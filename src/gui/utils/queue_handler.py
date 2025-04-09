@@ -17,15 +17,10 @@ class QueueHandler(QObject):
     video_title_signal = pyqtSignal(str)
     error_signal = pyqtSignal(str)
     enable_fetch_signal = pyqtSignal(object)
-    start_phase_signal = pyqtSignal(str)
-    progress_signal = pyqtSignal(object, str)
-    phase_complete_signal = pyqtSignal(object)
+    progress_signal = pyqtSignal(object)
     download_complete_signal = pyqtSignal(object)
     merge_failed_signal = pyqtSignal(str)
     download_error_signal = pyqtSignal(str)
-    calibration_progress_signal = pyqtSignal(str)
-    calibration_complete_signal = pyqtSignal(int)
-    # Add signal for PhantomJS status messages
     status_signal = pyqtSignal(str)
     
     def __init__(self, download_queue):
@@ -37,7 +32,6 @@ class QueueHandler(QObject):
         """
         super().__init__()
         self.queue = download_queue
-        self.current_download_phase = None
     
     def check_queue(self):
         """Process all pending messages in the queue using signals."""
@@ -46,55 +40,42 @@ class QueueHandler(QObject):
                 message = self.queue.get_nowait()
                 
                 message_type = message[0]
-                
-                # Special case for the download phase
-                if message_type == "set_phase":
-                    self.current_download_phase = message[1]
+                message_data = message[1] if len(message) > 1 else None
                 
                 # Emit signals based on message type
                 if message_type == "formats":
-                    # Ensure we always emit a list for formats
-                    formats_data = message[1]
+                    formats_data = message_data
                     if not isinstance(formats_data, list):
                         formats_data = [formats_data] if formats_data else []
                     self.formats_signal.emit(formats_data)
                 elif message_type == "video_title":
-                    self.video_title_signal.emit(message[1])
+                    self.video_title_signal.emit(message_data)
                 elif message_type == "error":
-                    self.error_signal.emit(message[1])
+                    self.error_signal.emit(message_data)
                 elif message_type == "enable_fetch":
-                    self.enable_fetch_signal.emit(message[1])
-                elif message_type == "start_phase":
-                    self.start_phase_signal.emit(message[1])
+                    self.enable_fetch_signal.emit(message_data)
                 elif message_type == "progress":
-                    # Progress message has structure ("progress", percent, speed_mbps, eta_str)
-                    # Create a list with all the values for consistent handling
-                    progress_data = [message[1]]  # First data item is percent
-                    if len(message) > 2:
-                        progress_data.append(message[2])  # Speed
-                    if len(message) > 3:
-                        progress_data.append(message[3])  # ETA
-                    self.progress_signal.emit(progress_data, self.current_download_phase)
-                elif message_type == "phase_complete":
-                    self.phase_complete_signal.emit(message[1])
+                    # Progress message structure is now: ("progress", percent, speed, eta)
+                    progress_data = [message[1]]  # Percent
+                    if len(message) > 2: progress_data.append(message[2]) # Speed
+                    if len(message) > 3: progress_data.append(message[3]) # ETA
+                    self.progress_signal.emit(progress_data) # Emit without phase
                 elif message_type == "download_complete":
-                    self.download_complete_signal.emit(message[1])
+                    self.download_complete_signal.emit(message_data)
                 elif message_type == "merge_failed":
-                    self.merge_failed_signal.emit(message[1])
+                    self.merge_failed_signal.emit(message_data)
                 elif message_type == "download_error":
-                    self.download_error_signal.emit(message[1])
-                elif message_type == "calibration_progress":
-                    self.calibration_progress_signal.emit(message[1])
-                elif message_type == "calibration_complete":
-                    self.calibration_complete_signal.emit(message[1])
-                # Handle status messages for PhantomJS
+                    self.download_error_signal.emit(message_data)
                 elif message_type == "status":
-                    self.status_signal.emit(message[1])
-                # Handle progress updates when total size is unknown
+                    # Handle specific status updates like Merging
+                    if isinstance(message_data, str) and "Merging" in message_data:
+                         self.status_signal.emit("Merging formats...")
+                    else:
+                         self.status_signal.emit(message_data)
                 elif message_type == "progress_unknown":
-                    downloaded_mb = message[1]
-                    progress_data = [0, f"{downloaded_mb}", ""]  # Use indeterminate progress (0%) but show downloaded size
-                    self.progress_signal.emit(progress_data, self.current_download_phase)
+                    downloaded_mb = message_data
+                    progress_data = [0, f"{downloaded_mb}", ""] 
+                    self.progress_signal.emit(progress_data)
                 
         except queue.Empty:
             pass
@@ -102,5 +83,5 @@ class QueueHandler(QObject):
             print(f"Error in queue handler: {str(e)}")
             
     def reset(self):
-        """Reset the download phase."""
-        self.current_download_phase = None 
+        """Reset internal state (if any)."""
+        pass 

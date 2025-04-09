@@ -17,7 +17,6 @@ class MenuBarComponent(QMenuBar):
     """
     
     # Signals
-    calibrate_triggered = pyqtSignal()
     theme_toggle_triggered = pyqtSignal()
     default_format_triggered = pyqtSignal()
     auto_fetch_toggled = pyqtSignal(bool)
@@ -42,11 +41,15 @@ class MenuBarComponent(QMenuBar):
         # Tools Menu
         self.tools_menu = self.addMenu("&Tools")
         
-        # Calibrate Action
-        self.calibrate_action = QAction("&Calibrate Connection", self)
-        self.calibrate_action.setStatusTip("Calibrate your connection for optimal download speed")
-        self.calibrate_action.triggered.connect(self._on_calibrate_triggered)
-        self.tools_menu.addAction(self.calibrate_action)
+        # Add a placeholder or remove Tools menu if empty
+        if not self.tools_menu.actions():
+             # Option 1: Add a placeholder action
+             placeholder_action = QAction("(No tools yet)", self)
+             placeholder_action.setEnabled(False)
+             self.tools_menu.addAction(placeholder_action)
+             # Option 2: Remove the empty Tools menu
+             # self.removeAction(self.tools_menu.menuAction())
+             # self.tools_menu = None # Set to None if removed
         
         # Settings Menu
         self.settings_menu = self.addMenu("&Settings")
@@ -191,10 +194,6 @@ class MenuBarComponent(QMenuBar):
             """)
     
     # Signal handlers
-    def _on_calibrate_triggered(self):
-        """Handle calibrate action."""
-        self.calibrate_triggered.emit()
-        
     def _on_theme_toggle_triggered(self):
         """Handle theme toggle action."""
         self.theme_toggle_triggered.emit()
