@@ -62,7 +62,8 @@ class Downloader:
                 command,
                 capture_output=capture_output,
                 text=text,
-                timeout=timeout
+                timeout=timeout,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
             )
             return result
         except subprocess.TimeoutExpired as e:
@@ -96,8 +97,9 @@ class Downloader:
             text=True,
             bufsize=1,  # Line buffered
             universal_newlines=True,
-            encoding='utf-8', # Specify encoding explicitly
-            errors='replace'  # Handle potential encoding errors
+            encoding='utf-8',  # Specify encoding explicitly
+            errors='replace',  # Handle potential encoding errors
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
         )
         
         self.ytdlp_process = process
@@ -661,4 +663,4 @@ class Downloader:
     def __del__(self):
         """Destructor to ensure cleanup."""
         self.cleanup()
-        self.cancel_active_process() 
+        self.cancel_active_process()

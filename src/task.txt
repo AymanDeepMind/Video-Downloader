@@ -1,0 +1,33 @@
+Task:
+Integrate a built-in yt-dlp update feature into my PyQt5-based YouTube downloader app. The app is packaged into an .exe using PyInstaller with the `--noconsole` and `--onedir` flags (read main.spec file for more info), so no console window should appear during any subprocess execution.
+
+Requirements:
+1. Add a function that updates `yt-dlp.exe` using its built-in update mechanism:
+   - The update command is: yt-dlp.exe -U
+   - It should run silently, without opening a console window (especially important since the app is packaged with `--noconsole`).
+   - Use `subprocess.run()` with the `creationflags=subprocess.CREATE_NO_WINDOW` option (Windows only) to hide any CMD window.
+
+2. Capture and process the output:
+   - If the output contains "yt-dlp is up to date", notify the user.
+   - If an update occurred, notify the user it was successful.
+   - If an error occurs, catch it and show a proper error message.
+
+3. Integrate the update check into the PyQt5 GUI:
+   - Add a menu action or button labeled “Update yt-dlp”.
+   - When clicked, trigger the update function.
+   - Use `QMessageBox` to show messages (e.g., success, already updated, or errors).
+
+4. Bonus (optional but preferred):
+   - Run the update in a background thread using `QThread` or `QThreadPool` to keep the GUI responsive.
+   - Disable the update button while the update is running, then re-enable it after.
+   - Log the update output to a text file for debugging if needed.
+
+Environment:
+- Windows 10+
+- Python 3.11+
+- Packaged with PyInstaller using --noconsole --onedir
+- UI built with PyQt5
+
+Expected Outcome:
+- Clean, user-friendly implementation of the yt-dlp self-updater inside a PyQt5 app with no console popups, correct error handling, and safe GUI integration.
+"""

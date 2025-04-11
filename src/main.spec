@@ -13,6 +13,7 @@ a = Analysis(
     datas=[
         (os.path.join(assets_path, 'ffmpeg'), 'assets/ffmpeg'),
         (os.path.join(assets_path, 'icon.ico'), 'assets'),
+        (os.path.join(assets_path, 'yt-dlp.exe'), 'assets'),
     ],
     hiddenimports=[
         'gui',
