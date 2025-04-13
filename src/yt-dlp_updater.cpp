@@ -88,10 +88,10 @@ int main() {
         // std::cout << "[yt-dlp] > " << line << std::endl;
 
         if (line.find("Updating to") != std::string::npos) {
-            std::cout << "\n> yt-dlp is being updated...\n\t- Do not close this window\n\t-Do not use the downloader during the process." << std::endl;
+            std::cout << "\n> yt-dlp is being updated...\n\n\t- Do not close this window\n\t- Do not use the downloader during the process." << std::endl;
             update_started = true;
         } else if (line.find("yt-dlp is up to date") != std::string::npos) {
-            std::cout << "\n> yt-dlp is already up to date." << std::endl;
+            std::cout << "\n> yt-dlp is already up to date. You can close the window." << std::endl;
             break;
         } else if (line.find("Updated yt-dlp to") != std::string::npos) {
             std::cout << "\n> yt-dlp was successfully updated! Now you can close the window and start downloading." << std::endl;
@@ -111,3 +111,4 @@ int main() {
     std::cin.get();
 
     return 0;
+}
