@@ -51,6 +51,18 @@ class MenuBarComponent(QMenuBar):
              # self.removeAction(self.tools_menu.menuAction())
              # self.tools_menu = None # Set to None if removed
         
+        # Remove placeholder if it exists
+        for action in self.tools_menu.actions():
+            if action.text() == "(No tools yet)":
+                self.tools_menu.removeAction(action)
+                break
+
+        # Update yt-dlp action
+        self.update_yt_dlp_action = QAction("&Update yt-dlp", self)
+        self.update_yt_dlp_action.setStatusTip("Update yt-dlp to the latest version")
+        self.update_yt_dlp_action.triggered.connect(self._on_update_yt_dlp_triggered)
+        self.tools_menu.addAction(self.update_yt_dlp_action)
+
         # Settings Menu
         self.settings_menu = self.addMenu("&Settings")
         
@@ -220,4 +232,9 @@ class MenuBarComponent(QMenuBar):
         
     def show_about(self):
         """Show about information and navigate to GitHub repository."""
-        webbrowser.open("https://github.com/AymanDeepMind/Video-Downloader") 
+        webbrowser.open("https://github.com/AymanDeepMind/Video-Downloader")
+
+    def _on_update_yt_dlp_triggered(self):
+        """Handle Update yt-dlp action."""
+        from src.update import run_yt_dlp_updater
+        run_yt_dlp_updater()
