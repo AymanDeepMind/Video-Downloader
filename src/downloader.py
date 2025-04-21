@@ -1,9 +1,7 @@
 import os
 import time
 import threading
-import logging
 import re
-import tempfile
 import sys
 import subprocess
 import json
@@ -12,12 +10,12 @@ from collections import defaultdict
 # Adjust import paths dynamically
 if getattr(sys, 'frozen', False):
     # Running as compiled .exe
-    from utils import format_size, format_time, ffmpeg_executable, sanitize_filename, logger, get_ytdlp_executable
+    from utils import format_size, ffmpeg_executable, sanitize_filename, logger, get_ytdlp_executable
     from config import load_fragments_config, save_fragments_config
     from phantom import PhantomJSHandler
 else:
     # Running directly as .py
-    from utils import format_size, format_time, ffmpeg_executable, sanitize_filename, logger, get_ytdlp_executable
+    from utils import format_size, ffmpeg_executable, sanitize_filename, logger, get_ytdlp_executable
     from config import load_fragments_config, save_fragments_config
     from phantom import PhantomJSHandler
 

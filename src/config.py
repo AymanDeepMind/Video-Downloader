@@ -1,11 +1,9 @@
 import os
 import configparser
-import logging
 import sys
 
 # Adjust import paths dynamically
 if getattr(sys, 'frozen', False):
-    # Running as compiled .exe
     from utils import logger
 else:
     # Running directly as .py

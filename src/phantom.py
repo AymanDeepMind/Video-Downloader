@@ -1,9 +1,7 @@
 import os
 import sys
 import subprocess
-import time
 import json
-import re
 import tempfile
 import logging
 from urllib.parse import urlparse
