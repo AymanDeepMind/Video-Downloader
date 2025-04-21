@@ -2,8 +2,6 @@
 
 A powerful Windows video downloader application that allows you to download videos and audio from various online platforms with customizable quality options.
 
-![ADM Video Downloader Screenshot](screenshots/app_screenshot.png)
-
 ## Features
 
 - **Multiple Download Types**:
@@ -12,9 +10,8 @@ A powerful Windows video downloader application that allows you to download vide
   - Audio Only (MP3)
 - **Quality Selection**: Choose from various resolution and bitrate options
 - **Custom Titles**: Edit video titles before downloading
-- **Download Speed Optimization**: Built-in calibration tool for faster downloads
 - **User-Friendly Interface**: Clean, themed UI with progress tracking
-- **Persistent Settings**: Remembers your download folder location and optimal speed settings
+- **Persistent Settings**: Remembers your download folder location
 - **Built-in FFmpeg**: Bundled with FFmpeg for media conversion
 
 ## System Requirements
@@ -52,36 +49,21 @@ A powerful Windows video downloader application that allows you to download vide
 ## Usage
 
 1. **Paste URL**: Copy the video URL and click "Paste"
-2. **Edit Title** (Optional): Click "Edit title" to customize the filename
-3. **Select Download Type**: Choose between Video+Audio, Video Only, or Audio Only
-4. **Calibrate** (Recommended): Click "Calibrate" to determine the optimal download settings for your internet connection
-5. **Fetch Formats**: Click "Fetch Formats" to retrieve available quality options
-6. **Select Format**: Choose your preferred quality/resolution
-7. **Choose Download Location**: Select a folder to save the download
-8. **Download**: Click "Download" to start the download process
-
-## Speed Optimization through Calibration
-
-The application features a smart calibration system that significantly improves download speeds:
-
-- **What it does**: Tests your internet connection with different parallel download settings
-- **How it works**: Downloads small test segments using various concurrent fragment counts
-- **Benefits**: Can improve download speeds by 2-5x on good connections
-- **Persistence**: Your optimal settings are saved between sessions
-- **When to use**: Run calibration:
-  - When first using the application
-  - After significant changes to your internet connection
-  - If you notice slower than expected download speeds
-
-The calibration process automatically determines how many simultaneous download fragments your connection can efficiently handle, optimizing both speed and stability.
+2. **Select Download Type**: Choose between Video+Audio, Video Only, or Audio Only
+3. **Fetch Formats**: Click "Fetch Formats" to retrieve available quality options
+4. **Edit Title** (Optional): Click "Edit title" to customize the filename
+5. **Select Format**: Choose your preferred quality/resolution
+6. **Choose Download Location**: Select a folder to save the download
+7. **Download**: Click "Download" to start the download process
 
 ## Dependencies
 
 - Python 3.6+ (for development)
 - yt-dlp
 - tkinter
-- ttkthemes
+- PyQt5
 - FFmpeg (bundled)
+- PhantomJS
 
 ## Building from Source
 
@@ -111,4 +93,5 @@ GitHub: [aymandeepmind](https://github.com/aymandeepmind)
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) - The core downloading engine
 - [FFmpeg](https://ffmpeg.org/) - For media processing
-- [ttkthemes](https://github.com/TkinterEP/ttkthemes) - For the UI theme 
+- [PyQt5](https://github.com/PyQt/PyQt5) - For the UI theme
+- [PhantomJS](https://github.com/ariya/phantomjs) - For headless browser automation
