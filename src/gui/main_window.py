@@ -107,7 +107,7 @@ class VideoDownloaderApp(QMainWindow):
 
     def setup_ui(self):
         """Set up the user interface."""
-        self.setWindowTitle("ADM Video Downloader v2.2.0")
+        self.setWindowTitle("ADM Video Downloader v2.2.1")
         self.setMinimumSize(600, 500)
         self.setMaximumSize(600, 500)
 
