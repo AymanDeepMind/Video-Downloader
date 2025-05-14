@@ -38,7 +38,7 @@ class ProgressSectionComponent(QWidget):
         self.status_label.setMinimumHeight(25)
         
         # Version label (remove calibration tip)
-        self.version_label = QLabel("AUTHOR - github.com/aymandeepmind") # Or just version/link
+        self.version_label = QLabel("github.com/aymanibnezakir") # Or just version/link
         self.version_label.setAlignment(Qt.AlignCenter)
         
         # Add widgets to layout
