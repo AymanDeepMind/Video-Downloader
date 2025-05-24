@@ -4,6 +4,13 @@ import sys
 import socket
 import logging
 
+def resource_path(relative_path):
+    if getattr(sys, 'frozen', False):
+        # Nuitka/pyinstaller: sys.executable is the exe in main.dist
+        base_path = os.path.dirname(sys.executable)
+        return os.path.join(base_path, relative_path)
+    return os.path.join(os.path.dirname(__file__), relative_path)
+
 # Set up logging
 logging.basicConfig(
     level=logging.DEBUG,
@@ -11,16 +18,6 @@ logging.basicConfig(
     filename=os.path.join(os.path.expanduser("~"), '.yt_downloader.log')
 )
 logger = logging.getLogger('yt_downloader')
-
-def resource_path(relative_path):
-    """Get absolute path to resource, works for dev and for PyInstaller"""
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        # If not running as exe, use the src directory's parent
-        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_path, relative_path)
 
 def format_size(size):
     """Convert bytes to MB for display."""
@@ -62,8 +59,7 @@ def sanitize_filename(name):
 if getattr(sys, 'frozen', False):
     # Running as compiled exe
     try:
-        # First try _MEIPASS path (PyInstaller temp directory)
-        ffmpeg_path = os.path.join(sys._MEIPASS, 'assets', 'ffmpeg', 'ffmpeg.exe')
+        ffmpeg_path = resource_path(os.path.join('assets', 'ffmpeg', 'ffmpeg.exe'))
         if not os.path.exists(ffmpeg_path):
             # If not found, try relative to executable
             ffmpeg_path = os.path.join(os.path.dirname(sys.executable), 'assets', 'ffmpeg', 'ffmpeg.exe')
@@ -73,7 +69,6 @@ if getattr(sys, 'frozen', False):
 else:
     # Running in development environment
     try:
-        # When running directly, ffmpeg should be in src/assets/ffmpeg
         current_dir = os.path.dirname(os.path.abspath(__file__))
         ffmpeg_path = os.path.join(current_dir, 'assets', 'ffmpeg', 'ffmpeg.exe')
     except Exception as e:
@@ -98,34 +93,26 @@ else:
             # Update PATH with the found location
             os.environ["PATH"] = os.path.dirname(ffmpeg_executable) + os.pathsep + os.environ["PATH"]
             break
-    
     if not ffmpeg_executable:
         logger.error("FFmpeg not found anywhere in the application directory")
 
 def get_ytdlp_executable():
     """Get the path to the yt-dlp executable."""
-    # Set up yt-dlp binary location
     if getattr(sys, 'frozen', False):
-        # Running as compiled exe
         try:
-            # First try _MEIPASS path (PyInstaller temp directory)
-            ytdlp_path = os.path.join(sys._MEIPASS, 'assets', 'yt-dlp.exe')
+            ytdlp_path = resource_path(os.path.join('assets', 'yt-dlp.exe'))
             if not os.path.exists(ytdlp_path):
-                # If not found, try relative to executable
                 ytdlp_path = os.path.join(os.path.dirname(sys.executable), 'assets', 'yt-dlp.exe')
         except Exception as e:
             logger.error(f"Error setting yt-dlp path in frozen state: {str(e)}")
             ytdlp_path = None
     else:
-        # Running in development environment
         try:
-            # When running directly, yt-dlp should be in src/assets/
             current_dir = os.path.dirname(os.path.abspath(__file__))
             ytdlp_path = os.path.join(current_dir, 'assets', 'yt-dlp.exe')
         except Exception as e:
             logger.error(f"Error setting yt-dlp path in development: {str(e)}")
             ytdlp_path = None
-
     # Verify the binary exists
     if ytdlp_path and os.path.exists(ytdlp_path):
         logger.info(f"yt-dlp binary found at: {ytdlp_path}")
@@ -139,6 +126,5 @@ def get_ytdlp_executable():
                 ytdlp_path = os.path.join(root, 'yt-dlp.exe')
                 logger.info(f"Found yt-dlp at alternate location: {ytdlp_path}")
                 return ytdlp_path
-        
         logger.error("yt-dlp binary not found anywhere in the application directory")
-        return None 
+        return None

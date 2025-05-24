@@ -27,15 +27,18 @@ class Downloader:
         self.active_threads = []
         self.ytdlp_process = None
         self.temp_files = []  # Track temporary files for cleanup
-        
         # Get yt-dlp executable path
+        from utils import get_ytdlp_executable, resource_path
         self.ytdlp_exe = get_ytdlp_executable()
         if not self.ytdlp_exe:
             logger.error("yt-dlp executable not found!")
             self.queue.put(("error", "yt-dlp executable not found!"))
-        
         # Initialize PhantomJS handler
         self.phantom_handler = PhantomJSHandler()
+        # Set up PhantomJS path
+        self.phantomjs_path = resource_path(os.path.join('assets', 'phantomjs.exe'))
+        if not os.path.exists(self.phantomjs_path):
+            self.phantomjs_path = os.path.join(os.path.dirname(sys.executable), 'assets', 'phantomjs.exe')
 
     def execute_ytdlp(self, args, capture_output=True, text=True, timeout=None):
         """Execute yt-dlp binary with given arguments and return the result.
@@ -352,6 +355,7 @@ class Downloader:
 
     def _process_phantom_results(self, phantom_urls, type_choice):
         """Process the URLs extracted by PhantomJS."""
+        # Use self.phantomjs_path wherever phantomjs.exe is needed
         try:
             formats = []
             self.format_map = {}
@@ -392,7 +396,7 @@ class Downloader:
             
             # Process the format part (for filename)
             if type_choice == '3':  # Audio
-                format_part = format_str.split(' - ')[0].strip() + " kbps"
+                format_part = format_str.split(' - ')[0].strip()
             else:  # Video
                 format_part = format_str.split(' - ')[0].strip()
             
